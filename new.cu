@@ -18,36 +18,100 @@ bool myComparison(const pair<float,int> &a,const pair<float,int> &b)
     return a.first>b.first;
 }
 
-class ACOParallel{ // Parallel code
 //loops
 // ----------- เดินทาง ---------------
 // 1. loop มดทุกตัว ---> thread ละตัว ?
 // 2. loop มดหนึ่งตัว เดินทางไปทุก node (บังคับ sequential)
-// 3. loop เพิ่มค่า delta pheromone ในแต่ละ node ที่ผ่าน
+// 3. loop เพิ่มค่า delta pheromone ในแต่ละ node ที่ผ่าน --> addDelta
 // ----------- หา next node -----------
 // 4. loop เอา denominator --> getTotalProb
 // 5. loop เอา probability ของทุก node ที่เชื่อมกับ node ปัจจุบัน --> getProbs
 // 6. loop cumulative sum เพื่อสุ่ม
 // ------------ update pheromone -----------
-// 7. loop อัปเดต pheromone จากตาราง delta
+// 7. loop อัปเดต pheromone จากตาราง delta --> matrix addition (with evaporation)
 
+class ACOParallel{ // Parallel code
     int totalNodes;
     int totalAnts;
     float evaRate = 0.5;
     int* map; //size = totalNodes * totalNodes
-    
 
-    void travel(){
+    __global__ void travel(){
+        int gidx = blockIdx.x * blockDim.x + threadIdx.x; // หมายเลขของมดจากมดทั้งหมด
 
+        // มด 1 ตัว = 1 THREAD
+        if(gidx < totalAnts){
+            int currNode = 0;
+            bool visited[totalNodes]; // visited for each ant
+            float totalCost = 0;
+            int nextNode = getNextNode();
+            vector<pair<int, int>> traveledThrough;
+            
+            // one ant travels every node
+            for(int i = 0; i < totalNodes; i++){
+               int nextNode = getNextNode();
+               totalCost += map[currNode][nextNode]; // .cost
+                pair<int, int> nodePair;
+                nodePair.first = currNode;
+                nodePair.second = nextNode;
+                traveledThrough.push_back(nodePair);
+                currNode = nextNode;
+                visited[currNode] = true;
+            }
+
+            totalCost += map[currNode][0]; // .cost
+
+            addDelta(totalCost);
+        }
     }
 
-    int getNextNode(){
+    __global__ void addDelta(float totalCost, vector<pair<int, int>> traveledThrough){
+        float toAdd = 1.0/totalCost;
+        int size = traveledThrough.size();
+        
+        if(gidx < size){
+            delta[traveledThrough[gidx].first][traveledThrough[gidx].second] += 1.0 / totalCost;
+            delta[traveledThrough[gidx].first][traveledThrough[gidx].second] += 1.0 / totalCost;
+        }
+    }
 
+    __global__ void getDenom(float totalProb, int currNode){
+        int gidx = blockDim.x * blockIdx.x + threadIdx.x;
+        if(!visited[gidx] && map[currNode][gidx].cost > 0){
+            totalProb += map[currNode][gidx].pheromone * (1.0/map[currNode][gidx].cost);
+        }
+    }
+
+    __global__ void getProbs(vector<pair<float, int>> probs, bool visited[], int currNode, float totalProb){
+        int gidx = blockDim.x * blockIdx.x + threadIdx.x;
+        if(!visited[gidx] && map[currNode][gidx].cost > 0){
+            float currProb = map[currNode][gidx].pheromone * (1.0 / map[currNode][i].cost) / totalProb;
+            pair<float, int> probWithIndex;
+            probWithIndex.first = currProb;
+            probWithIndex.second = i;
+            probs.push_back(probWithIndex);
+        }
+    }
+
+    int getNextNode(vector<bool> visited, int currNode){
+        // Find max prob. and choose next node
+        float r = ((float) rand() / (RAND_MAX));
+        vector<pair<float,int>> probs;
+        float totalProb = getDenom();
+        int nextNode;
+
+        getProbs(probs);
+        
+        //sort
+        // loop cumulative sum
+        
+        return probs[probs.size() - 1].second;
     }
 
     void updatePheromone(){
-
+        // matrix addition
     }
+
 };
 
 class ACO{ // Sequential code
@@ -132,6 +196,7 @@ class ACO{ // Sequential code
         return probs[probs.size()-1].second;
     }
 
+    // update pheromone (every update old pheromone evaporates by evaRate)
     void updatePheromones(){
         for(int i = 0; i < totalNodes; i++){
             for(int j = 0; j < totalNodes; j++){

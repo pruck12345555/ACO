@@ -19,8 +19,35 @@ bool myComparison(const pair<float,int> &a,const pair<float,int> &b)
 }
 
 class ACOParallel{ // Parallel code
+//loops
+// ----------- เดินทาง ---------------
+// 1. loop มดทุกตัว ---> thread ละตัว ?
+// 2. loop มดหนึ่งตัว เดินทางไปทุก node (บังคับ sequential)
+// 3. loop เพิ่มค่า delta pheromone ในแต่ละ node ที่ผ่าน
+// ----------- หา next node -----------
+// 4. loop เอา denominator --> getTotalProb
+// 5. loop เอา probability ของทุก node ที่เชื่อมกับ node ปัจจุบัน --> getProbs
+// 6. loop cumulative sum เพื่อสุ่ม
+// ------------ update pheromone -----------
+// 7. loop อัปเดต pheromone จากตาราง delta
 
+    int totalNodes;
+    int totalAnts;
+    float evaRate = 0.5;
+    int* map; //size = totalNodes * totalNodes
     
+
+    void travel(){
+
+    }
+
+    int getNextNode(){
+
+    }
+
+    void updatePheromone(){
+
+    }
 };
 
 class ACO{ // Sequential code

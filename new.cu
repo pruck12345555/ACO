@@ -31,87 +31,116 @@ bool myComparison(const pair<float,int> &a,const pair<float,int> &b)
 // 7. loop อัปเดต pheromone จากตาราง delta --> matrix addition (with evaporation)
 
 class ACOParallel{ // Parallel code
+    // Host attributes
     int totalNodes;
-    int totalAnts;
-    float evaRate = 0.5;
-    int* map; //size = totalNodes * totalNodes
+    int totalAnt;
+    float evaRate;
+    edges *map = (edges*)malloc(sizeof(edges)*TOTAL_NODE*TOTAL_NODE);
+
+    // Device attributes
+    edges* d_map;
+    float* d_delta;
+
+    void initialize(){
+        cudaMalloc((void**) &d_map, sizeof(edges)*TOTAL_NODE*TOTAL_NODE);
+        cudaMalloc((void**) &d_delta, sizeof(float)*TOTAL_NODE*TOTAL_NODE);
+    }
 
     __global__ void travel(){
-        int gidx = blockIdx.x * blockDim.x + threadIdx.x; // หมายเลขของมดจากมดทั้งหมด
-
-        // มด 1 ตัว = 1 THREAD
-        if(gidx < totalAnts){
-            int currNode = 0;
-            bool visited[totalNodes]; // visited for each ant
-            float totalCost = 0;
-            int nextNode = getNextNode();
-            vector<pair<int, int>> traveledThrough;
-            
-            // one ant travels every node
-            for(int i = 0; i < totalNodes; i++){
-               int nextNode = getNextNode();
-               totalCost += map[currNode][nextNode]; // .cost
-                pair<int, int> nodePair;
-                nodePair.first = currNode;
-                nodePair.second = nextNode;
-                traveledThrough.push_back(nodePair);
-                currNode = nextNode;
-                visited[currNode] = true;
-            }
-
-            totalCost += map[currNode][0]; // .cost
-
-            addDelta(totalCost);
-        }
-    }
-
-    __global__ void addDelta(float totalCost, vector<pair<int, int>> traveledThrough){
-        float toAdd = 1.0/totalCost;
-        int size = traveledThrough.size();
+        // 1 thread = 1 ant (1.)
+        int gidx = threadIdx.x + blockDim.x * blockIdx.x;
+        int currNode = 0;
+        bool visited[TOTAL_NODE];
+        float totalCost = 0;
         
-        if(gidx < size){
-            delta[traveledThrough[gidx].first][traveledThrough[gidx].second] += 1.0 / totalCost;
-            delta[traveledThrough[gidx].first][traveledThrough[gidx].second] += 1.0 / totalCost;
+        bool* traveledThrough;
+        cudaMalloc((void**) traveledThrough, sizeof(bool)*totalNodes*totalNodes);
+
+        // Initialize visited
+        if(gidx < totalNodes) visited[gidx] = 0;
+
+        // Every ant goes through every node (2.)
+        for(int j = 0; j < totalNodes-1; j++){
+            int nextNode = getNextNode(visited, currNode);
+            totalCost += map[currNode*totalNodes+nextNode].cost;
+            traveledThrough[currNode*totalNodes+nextNode] = true;
+            traveledThrough[nextNode*totalNodes+currNode] = true;
+            currNode = nextNode;
+            visited[currNode] = true;    
         }
+
+        totalCost += map[0+currNode].cost;
+
+        // Plus on delta map for every node that passes through (3.)
+        while(gidx < totalNodes){
+            for(int i = 0; i< totalNodes; i++){
+                if(traveledThrough[gidx*totalNodes + i]){
+                    d_delta[gidx*totalNodes+i] += 1.0/totalCost;
+                }
+            }
+        }
+
+        updatePheromone();
     }
 
-    __global__ void getDenom(float totalProb, int currNode){
+    // get denominator (4.)
+    __global__ void getTotalProbs(float totalProb, int currNode, bool visited[], int totalConnect){
         int gidx = blockDim.x * blockIdx.x + threadIdx.x;
-        if(!visited[gidx] && map[currNode][gidx].cost > 0){
-            totalProb += map[currNode][gidx].pheromone * (1.0/map[currNode][gidx].cost);
+        if(gidx < totalNodes){
+            if(!visited[gidx] && map[currNode*totalNodes + gidx].cost > 0){
+                totalProb += map[currNode*totalNodes + gidx].pheromone * (1.0 / map[currNode*totalNodes + gidx].cost);
+                totalConnect++;
+            }
         }
     }
 
-    __global__ void getProbs(vector<pair<float, int>> probs, bool visited[], int currNode, float totalProb){
+    // 5.
+    __global__ void getProbs(float* probs, bool visited[], int currNode, float totalProb){
         int gidx = blockDim.x * blockIdx.x + threadIdx.x;
-        if(!visited[gidx] && map[currNode][gidx].cost > 0){
-            float currProb = map[currNode][gidx].pheromone * (1.0 / map[currNode][i].cost) / totalProb;
-            pair<float, int> probWithIndex;
-            probWithIndex.first = currProb;
-            probWithIndex.second = i;
-            probs.push_back(probWithIndex);
+
+        if(gidx < totalNodes){
+            if(!visited[gidx] && map[currNode*totalNodes + gidx].cost > 0){
+                float currProb = map[currNode*totalNodes + gidx].pheromone * (1.0 / map[currNode*totalNodes + gidx].cost) / totalProb;
+                probs[gidx] = currProb;
+            }
         }
     }
 
-    int getNextNode(vector<bool> visited, int currNode){
+    __global__ int getNextNode(bool visited[], int currNode){
         // Find max prob. and choose next node
-        float r = ((float) rand() / (RAND_MAX));
-        vector<pair<float,int>> probs;
-        float totalProb = getDenom();
+        float r = ((float) rand() / (RAND_MAX)); // 0 <= r <= 1
+        //vector<pair<float,int>> probs; // first = probs, second = node index
+        float* probs;
+        cudaMalloc((void**) &probs, sizeof(float)*totalNodes);
+        float totalProb = 0;
+        int totalConnect = 0;
         int nextNode;
 
-        getProbs(probs);
-        
-        //sort
-        // loop cumulative sum
-        
-        return probs[probs.size() - 1].second;
+        // Get denominator
+        getTotalProbs(totalProb, currNode, visited, totalConnect);
+
+        // Get all probs of connected nodes
+        getProbs(probs, visited, currNode, totalProb);
+
+        // easy random return
+        for(int i = 0; i < totalNodes - 1; i++){
+            if(probs[i] <= r) return i;
+        }
+
+        // return last index if loop does not return
+        // total connected nodes needed
+        return probs[totalConnect-1];
     }
 
-    void updatePheromone(){
-        // matrix addition
-    }
+    // 7.
+    __global__ void updatePheromone(){
+        const int col = blockDim.x * blockIdx.x + threadIdx.x;
+        const int row = blockDim.y * blockIdx.y + threadIdx.y;
 
+        if(row < totalNodes && col < totalNodes){
+            map[row * totalNodes + col].pheromone = ((1 - evaRate) * map[row * totalNodes + col].pheromone) + d_delta[row * totalNodes + col];
+        }
+    }
 };
 
 class ACO{ // Sequential code

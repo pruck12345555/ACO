@@ -40,10 +40,18 @@ class ACOParallel{ // Parallel code
     // Device attributes
     edges* d_map;
     float* d_delta;
+    bool* traveledThrough;
+
+    void start(){
+        initialize();
+        travel<<<2,256>>>();
+        updatePheromone();
+    }
 
     void initialize(){
         cudaMalloc((void**) &d_map, sizeof(edges)*TOTAL_NODE*TOTAL_NODE);
         cudaMalloc((void**) &d_delta, sizeof(float)*TOTAL_NODE*TOTAL_NODE);
+        cudaMalloc((void**) &traveledThrough, sizeof(bool)*totalNodes*totalNodes);
     }
 
     __global__ void travel(){
@@ -52,9 +60,6 @@ class ACOParallel{ // Parallel code
         int currNode = 0;
         bool visited[TOTAL_NODE];
         float totalCost = 0;
-        
-        bool* traveledThrough;
-        cudaMalloc((void**) traveledThrough, sizeof(bool)*totalNodes*totalNodes);
 
         // Initialize visited
         if(gidx < totalNodes) visited[gidx] = 0;
@@ -75,27 +80,26 @@ class ACOParallel{ // Parallel code
         while(gidx < totalNodes){
             for(int i = 0; i< totalNodes; i++){
                 if(traveledThrough[gidx*totalNodes + i]){
-                    d_delta[gidx*totalNodes+i] += 1.0/totalCost;
+                    atomicAdd(&d_delta[gidx*totalNodes+i],1.0/totalCost);
                 }
             }
         }
-
-        updatePheromone();
+        __syncthreads();
     }
 
     // get denominator (4.)
-    __global__ void getTotalProbs(float totalProb, int currNode, bool visited[], int totalConnect){
+    __global__ void getTotalProbs(float* totalProb, int currNode, bool visited[], int *totalConnect){
         int gidx = blockDim.x * blockIdx.x + threadIdx.x;
         if(gidx < totalNodes){
             if(!visited[gidx] && map[currNode*totalNodes + gidx].cost > 0){
-                totalProb += map[currNode*totalNodes + gidx].pheromone * (1.0 / map[currNode*totalNodes + gidx].cost);
-                totalConnect++;
+                *totalProb += map[currNode*totalNodes + gidx].pheromone * (1.0 / map[currNode*totalNodes + gidx].cost);
+                *totalConnect++;
             }
         }
     }
 
     // 5.
-    __global__ void getProbs(float* probs, bool visited[], int currNode, float totalProb){
+    __global__ void getProbs(float *probs, bool visited[], int currNode, float totalProb){
         int gidx = blockDim.x * blockIdx.x + threadIdx.x;
 
         if(gidx < totalNodes){
@@ -110,14 +114,13 @@ class ACOParallel{ // Parallel code
         // Find max prob. and choose next node
         float r = ((float) rand() / (RAND_MAX)); // 0 <= r <= 1
         //vector<pair<float,int>> probs; // first = probs, second = node index
-        float* probs;
-        cudaMalloc((void**) &probs, sizeof(float)*totalNodes);
+        float probs[TOTAL_NODE];
         float totalProb = 0;
         int totalConnect = 0;
         int nextNode;
 
         // Get denominator
-        getTotalProbs(totalProb, currNode, visited, totalConnect);
+        getTotalProbs(&totalProb, currNode, visited, &totalConnect);
 
         // Get all probs of connected nodes
         getProbs(probs, visited, currNode, totalProb);

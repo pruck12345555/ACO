@@ -40,26 +40,24 @@ class ACOParallel{ // Parallel code
     // Device attributes
     edges* d_map;
     float* d_delta;
-    bool* traveledThrough;
 
     void start(){
         initialize();
         travel<<<2,256>>>();
-        updatePheromone();
     }
 
     void initialize(){
         cudaMalloc((void**) &d_map, sizeof(edges)*TOTAL_NODE*TOTAL_NODE);
         cudaMalloc((void**) &d_delta, sizeof(float)*TOTAL_NODE*TOTAL_NODE);
-        cudaMalloc((void**) &traveledThrough, sizeof(bool)*totalNodes*totalNodes);
     }
 
     __global__ void travel(){
         // 1 thread = 1 ant (1.)
         int gidx = threadIdx.x + blockDim.x * blockIdx.x;
         int currNode = 0;
-        bool visited[TOTAL_NODE];
-        float totalCost = 0;
+        bool visited[TOTAL_NODE]; // visited array for each ant
+        float totalCost = 0; // total cost for each ant (Lk)
+        bool traveledThrough[TOTAL_NODE*TOTAL_NODE]; // traveled through edges for each trip
 
         // Initialize visited
         if(gidx < totalNodes) visited[gidx] = 0;
@@ -74,10 +72,10 @@ class ACOParallel{ // Parallel code
             visited[currNode] = true;    
         }
 
-        totalCost += map[0+currNode].cost;
+        totalCost += map[0+currNode].cost; // From last node back to start
 
         // Plus on delta map for every node that passes through (3.)
-        while(gidx < totalNodes){
+        if(gidx < totalNodes){
             for(int i = 0; i< totalNodes; i++){
                 if(traveledThrough[gidx*totalNodes + i]){
                     atomicAdd(&d_delta[gidx*totalNodes+i],1.0/totalCost);
@@ -85,6 +83,9 @@ class ACOParallel{ // Parallel code
             }
         }
         __syncthreads();
+
+        // Update pheromones after delta map is done (one time)
+        if(gidx == 0) updatePheromone();
     }
 
     // get denominator (4.)
@@ -137,6 +138,7 @@ class ACOParallel{ // Parallel code
 
     // 7.
     __global__ void updatePheromone(){
+        // CANNOT USE BLOCKDIM Y
         const int col = blockDim.x * blockIdx.x + threadIdx.x;
         const int row = blockDim.y * blockIdx.y + threadIdx.y;
 
@@ -183,9 +185,8 @@ class ACO{ // Sequential code
                 delta[traveledThrough[k].first][traveledThrough[k].second] += 1.0 / totalCost;
                 delta[traveledThrough[k].second][traveledThrough[k].first] += 1.0 / totalCost;
             }
+            updatePheromones();
         }
-
-        updatePheromones();
     }
 
     int getNextNode(vector<bool> visited, int currNode){ 

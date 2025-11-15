@@ -14,18 +14,6 @@ struct edges{
     float pheromone;
 };
 
-//loops
-// ----------- เดินทาง ---------------
-// 1. loop มดทุกตัว ---> thread ละตัว ?
-// 2. loop มดหนึ่งตัว เดินทางไปทุก node (บังคับ sequential)
-// 3. loop เพิ่มค่า delta pheromone ในแต่ละ node ที่ผ่าน --> addDelta
-// ----------- หา next node -----------
-// 4. loop เอา denominator --> getTotalProb
-// 5. loop เอา probability ของทุก node ที่เชื่อมกับ node ปัจจุบัน --> getProbs
-// 6. loop cumulative sum เพื่อสุ่ม
-// ------------ update pheromone -----------
-// 7. loop อัปเดต pheromone จากตาราง delta --> matrix addition (with evaporation)
-
 __global__ void travel(int totalNodes, edges* map, float* delta){
     const int gidx = blockIdx.x * blockDim.x + threadIdx.x;
     bool visited[TOTAL_NODE];
@@ -37,9 +25,10 @@ __global__ void travel(int totalNodes, edges* map, float* delta){
             temp[i][j] = 0;
         }
     }
-    
+
     float totalCost = 0; // Lk
     int currNode = 0;
+    int nextNode = 1;
 
     // Inititalize visited array for each ant
     for(int i = 0; i < totalNodes; i++) visited[i] = 0;
@@ -47,7 +36,7 @@ __global__ void travel(int totalNodes, edges* map, float* delta){
     // Ant kth travel thorugh every node
     if(gidx < TOTAL_ANT){
         for(int i = 0; i < totalNodes - 1; i++){
-            int nextNode = 1;
+            // Calculate for next node
             totalCost += map[currNode*totalNodes + nextNode].cost;
             temp[currNode][nextNode] = true;
             temp[nextNode][currNode] = true;

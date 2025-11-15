@@ -1,0 +1,18 @@
+probs[totalNodes]
+totalProbs;
+
+for(int i = 0; i < totalNodes; i++){
+    if(map[currNode][i].cost > 0 ) // connects
+    {
+        Tij = map[curRNode][i].pheromone;
+        nij = 1.0 / map[currNode][i].cost; 
+        probs[i] = Tij * nij; 
+        totalProbs += Tij * nij;
+    }
+}
+
+for(int j = 0; j < totalNodes; j++){
+    if(probs[j] > 0){
+        probs[j] = probs[j] / totalProbs;
+    }
+}

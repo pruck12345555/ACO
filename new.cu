@@ -6,7 +6,7 @@
 #include <vector>
 #include <algorithm>
 using namespace std;
-#define TOTAL_NODE 250
+#define TOTAL_NODE 20
 
 struct edges{
     float cost;
@@ -43,7 +43,11 @@ class ACOParallel{ // Parallel code
 
     void start(){
         initialize();
-        travel<<<2,256>>>();
+        const int NUM_BLOCK = 2;
+        const int NUM_GRID = TOTAL_NODE / NUM_BLOCK;
+        dim3 dimGridAll(NUM_GRID, NUM_GRID, 1);
+        dim3 dimBlockAll(NUM_BLOCK, NUM_BLOCK, 1);
+        travel<<<dimGridAll,dimBlockAll>>>();
     }
 
     void initialize(){

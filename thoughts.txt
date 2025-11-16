@@ -17,6 +17,8 @@ for(int j = 0; j < totalNodes; j++){
     }
 }
 
+0.2 0.1 0.0 0.0 0.7
+0.8 0.7 0.7 0.7 0.0
 
 https://ianfinlayson.net/class/cpsc425/samples/cuda/random1.cu
 https://docs.nvidia.com/cuda/curanddx/get_started/introduction.html

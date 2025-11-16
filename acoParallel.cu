@@ -62,16 +62,30 @@ __global__ void travel(int totalNodes, edges* map, float* delta){
             }
 
             // Turning probs to cumulative sum
+            for(int a = 0; a < totalNodes; a++){
+                if(a == 0){
+                    probs[a] = 1 - probs[a];
+                }
+                else{
+                    probs[a] = probs[a-1] - probs[a];
+                }
+            }
 
-
-            // Random and choose node
+            // Random 
             curandState_t state;
-            curand_init(0, /* the seed controls the sequence of random values that are produced */
+            curand_init(gidx, /* the seed controls the sequence of random values that are produced */
             0, /* the sequence number is only important with multiple cores */
             0, /* the offset is how much extra we advance in the sequence for each call, can be 0 */
             &state);
-            int result = curand(&state) % 1;
-            
+            int r = curand(&state) % 1;
+
+            // Random next node
+            for(int b = 0; b < totalNodes; b++){
+                if(r >= probs[b]){
+                    nextNode = b;
+                    break;
+                }
+            }
 
             // Get next node
             totalCost += map[currNode*totalNodes + nextNode].cost;

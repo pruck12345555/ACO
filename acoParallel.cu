@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <cuda_runtime.h>
 #include <cuda.h>
+#include <curand.h>
+#include <curand_kernel.h>
 #include <stdlib.h>
 #include <iostream>
 #include <vector>
@@ -63,6 +65,12 @@ __global__ void travel(int totalNodes, edges* map, float* delta){
 
 
             // Random and choose node
+            curandState_t state;
+            curand_init(0, /* the seed controls the sequence of random values that are produced */
+            0, /* the sequence number is only important with multiple cores */
+            0, /* the offset is how much extra we advance in the sequence for each call, can be 0 */
+            &state);
+            int result = curand(&state) % 1;
             
 
             // Get next node

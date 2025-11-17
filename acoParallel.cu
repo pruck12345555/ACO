@@ -17,7 +17,7 @@ struct edges{
     float pheromone;
 };
 
-__global__ void travel(int totalNodes, edges* map, float* delta){
+__global__ void travel(int totalNodes,int totalAnts, edges* map, float* delta){
     const int gidx = blockIdx.x * blockDim.x + threadIdx.x;
     bool visited[TOTAL_NODE];
     bool temp[TOTAL_NODE][TOTAL_NODE]; // Boolean matrix to store edges that kth ant went through
@@ -45,22 +45,26 @@ __global__ void travel(int totalNodes, edges* map, float* delta){
     visited[0] = true;
 
     // Ant kth travel thorugh every node
-    if(gidx < TOTAL_ANT){
+    if(gidx < totalAnts){
         for(int i = 0; i < totalNodes - 1; i++){
             // Calculate for next node
             // Getting totalProbs
+            bool nextNodeExist = false;
             float probs[TOTAL_NODE];
             float totalProbs = 0;
             for(int l = 0; l < totalNodes; l++) probs[l] = 0;
 
             for(int j = 0; j < totalNodes; j++){
                 if(!visited[j] && map[currNode*totalNodes+j].cost > 0){ // connects
+                    nextNodeExist = true; // probs is not all 0
                     float Tij = map[currNode*totalNodes+j].pheromone;
                     float nij = 1.0 / map[currNode*totalNodes+j].cost; 
                     probs[j] = Tij * nij; 
                     totalProbs += Tij * nij;
                 }
             }
+
+            if(!nextNodeExist) break;
 
             // Getting all probabilities
             for(int k = 0; k < totalNodes; k++){
@@ -97,18 +101,20 @@ __global__ void travel(int totalNodes, edges* map, float* delta){
             visited[currNode] = true;
         }
         
-        // Add from finish to start
-        totalCost += map[currNode*totalNodes].cost;
-        temp[currNode][0] = true;
-        temp[0][currNode] = true;
+        // Add from finish to start only if start and finish connects
+        if(map[currNode*totalNodes].cost > 0){
+            totalCost += map[currNode*totalNodes].cost;
+            temp[currNode][0] = true;
+            temp[0][currNode] = true;
 
-        // Ant kth finished travel through every node (got Lk)
-        // add to pheromone delta matrix
-        for(int i= 0; i < totalNodes; i++){
-            for(int j = 0; j < totalNodes; j++){
-                // If passed, update
-                if(temp[i][j]){
-                    atomicAdd(&delta[i*totalNodes+j], 1.0 / totalCost);
+            // Ant kth finished travel through every node (got Lk)
+            // add to pheromone delta matrix
+            for(int i= 0; i < totalNodes; i++){
+                for(int j = 0; j < totalNodes; j++){
+                    // If passed, update
+                    if(temp[i][j]){
+                        atomicAdd(&delta[i*totalNodes+j], 1.0 / totalCost);
+                    }
                 }
             }
         }
@@ -125,7 +131,7 @@ __global__ void updatePheromones(int totalNodes, float evaRate, edges* map, floa
     }
 }
 
-void ACOParallel(int totalNodes, float evaRate, size_t mapSize, edges* map, int epochs){
+void ACOParallel(int totalNodes, int totalAnts, float evaRate, size_t mapSize, edges* map, int epochs){
     edges* d_map;
     float* delta; // Pheromone delta matrix
     dim3 dimGrid(2,2,1);
@@ -139,7 +145,7 @@ void ACOParallel(int totalNodes, float evaRate, size_t mapSize, edges* map, int 
     cudaMemcpy(d_map, map, mapSize, cudaMemcpyHostToDevice);
     for(int i = 0; i < epochs; i++){
         cudaMemset((void*) delta, 0, sizeof(float)*totalNodes*totalNodes);
-        travel<<<1, TOTAL_ANT>>>(totalNodes, d_map, delta);
+        travel<<<1, totalAnts>>>(totalNodes, totalAnts, d_map, delta);
         cudaDeviceSynchronize();
         updatePheromones<<<dimGrid, dimBlock>>>(totalNodes, evaRate, d_map, delta);
         cudaDeviceSynchronize();
@@ -173,11 +179,21 @@ void init(int totalNodes,edges* map, string fileNameCost, string fileNamePheromo
     }
 }
 
-void printPheromone(edges* map){
+void printCost(int totalNodes, edges* map){
+    cout << "---------- COST PRINTING -----------" << endl;
+    for(int i = 0; i < totalNodes; i++){
+        for(int j = 0; j < totalNodes; j++){
+            cout << map[i*totalNodes + j].cost << " ";
+        }
+        cout << endl;
+    }
+}
+
+void printPheromone(int totalNodes, edges* map){
     cout << "---------- PHEROMONE PRINTING -----------" << endl;
-    for(int i = 0; i < TOTAL_NODE; i++){
-        for(int j = 0; j < TOTAL_NODE; j++){
-            cout << map[i*TOTAL_NODE + j].pheromone << " ";
+    for(int i = 0; i < totalNodes; i++){
+        for(int j = 0; j < totalNodes; j++){
+            cout << map[i*totalNodes + j].pheromone << " ";
         }
         cout << endl;
     }
@@ -185,6 +201,7 @@ void printPheromone(edges* map){
 
 int main(){
     int totalNodes = TOTAL_NODE;
+    int totalAnts = TOTAL_ANT;
     float evaRate = 0.5;
     size_t mapSize = sizeof(edges)*totalNodes*totalNodes;
     edges* map = (edges*)malloc(mapSize);
@@ -194,8 +211,9 @@ int main(){
 
     init(totalNodes, map, "cost.txt","pheromone.txt");
     cout << "AFTER INIT" << endl;
-    printPheromone(map);
-    ACOParallel(totalNodes, evaRate, mapSize, map, epochs);
-    printPheromone(map);
+    printCost(totalNodes, map);
+    printPheromone(totalNodes, map);
+    ACOParallel(totalNodes, totalAnts, evaRate, mapSize, map, epochs);
+    printPheromone(totalNodes, map);
     free(map);
 }

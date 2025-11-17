@@ -116,7 +116,8 @@ public:
                 visited[currNode] = true;          
             }
 
-            if(nextNodeExist){
+            // Loop succeed & Last node connects with first
+            if(nextNodeExist && map[currNode][0].cost > 0){
                 totalCost += map[currNode][0].cost; // From last node to start
 
                 // Plus on delta map for every node that passes through

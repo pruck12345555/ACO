@@ -21,9 +21,16 @@ __global__ void travel(int totalNodes, edges* map, float* delta){
     bool visited[TOTAL_NODE];
     bool temp[TOTAL_NODE][TOTAL_NODE]; // Boolean matrix to store edges that kth ant went through
 
+    // Random 
+    curandState_t state;
+    curand_init(gidx, /* the seed controls the sequence of random values that are produced */
+    0, /* the sequence number is only important with multiple cores */
+    0, /* the offset is how much extra we advance in the sequence for each call, can be 0 */
+    &state);
+    
     // Inititalize temp
-    for(int i = 0; i < TOTAL_NODE; i++){
-        for(int j = 0; j < TOTAL_NODE; j++){
+    for(int i = 0; i < totalNodes; i++){
+        for(int j = 0; j < totalNodes; j++){
             temp[i][j] = 0;
         }
     }
@@ -71,13 +78,7 @@ __global__ void travel(int totalNodes, edges* map, float* delta){
                 }
             }
 
-            // Random 
-            curandState_t state;
-            curand_init(gidx, /* the seed controls the sequence of random values that are produced */
-            0, /* the sequence number is only important with multiple cores */
-            0, /* the offset is how much extra we advance in the sequence for each call, can be 0 */
-            &state);
-            int r = curand(&state) % 1;
+            float r = curand_uniform(&state);
 
             // Random next node
             for(int b = 0; b < totalNodes; b++){
@@ -118,7 +119,7 @@ __global__ void updatePheromones(int totalNodes, float evaRate, edges* map, floa
     const int row = blockDim.y * blockIdx.y + threadIdx.y;
     const int gidx = row*totalNodes + col;
     
-    if(col < TOTAL_NODE && row < TOTAL_NODE){
+    if(col < totalNodes && row < totalNodes){
         map[gidx].pheromone = (1-evaRate) * map[gidx].pheromone + delta[gidx];
     }
 }
@@ -145,6 +146,10 @@ void ACOParallel(int totalNodes, float evaRate, size_t mapSize, edges* map, int 
     // Copy device to host
     cudaMemcpy(map, d_map, mapSize, cudaMemcpyDeviceToHost);
     cudaFree(d_map);
+}
+
+void init(edges* map, string fileName){
+
 }
 
 int main(){

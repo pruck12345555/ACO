@@ -17,9 +17,12 @@ for(int j = 0; j < totalNodes; j++){
     }
 }
 
-0.2 0.1 0.0 0.0 0.7
-0.8 0.7 0.7 0.7 0.0
+probs = [0.2, 0.0, 0.5, 0.0, 0.1, 0.0, 0.2]
+cum =   [0.8, 0.8, 0.3, 0.3, 0.2, 0.2, 0.0]
 
 https://ianfinlayson.net/class/cpsc425/samples/cuda/random1.cu
 https://docs.nvidia.com/cuda/curanddx/get_started/introduction.html
 https://nidclip.wordpress.com/2014/04/02/cuda-random-number-generation/
+
+- lower memory use of temp, vistied, probs
+- test all things

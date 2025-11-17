@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <iostream>
 #include <vector>
+#include <fstream>
 #include <algorithm>
 using namespace std;
 #define TOTAL_NODE 20
@@ -153,11 +154,52 @@ class ACOParallel{ // Parallel code
 };
 
 class ACO{ // Sequential code
+public:
     int totalNodes;
     int totalAnts;
-    float evaRate = 0.5;
-    vector<vector<edges>> map;
-    vector<vector<float>> delta;
+    float evaRate;
+    int epochs;
+    //vector<vector<edges>> map;
+    edges map[TOTAL_NODE][TOTAL_NODE];
+    float delta[TOTAL_NODE][TOTAL_NODE];
+
+    ACO(int totalNodes, int totalAnts, float evaRate, int epochs){
+        this->totalAnts = totalAnts;
+        this->evaRate = evaRate;
+        this->epochs = epochs;
+        this->totalNodes = totalNodes;
+    }
+
+    void init(string fileNameCost, string fileNamePheromone){
+        ifstream fileReader;
+        ifstream fileReader2;
+
+        // Read cost
+        fileReader.open(fileNameCost);
+        for(int i = 0; i < totalNodes; i++){
+            for(int j = 0; j < totalNodes; j++){
+                fileReader >> map[i][j].cost; 
+            }
+        }
+        fileReader.close();
+
+        // Read pheromone
+        fileReader2.open(fileNamePheromone);
+        for(int i = 0; i < totalNodes; i++){
+            for(int j = 0; j < totalNodes; j++){
+            fileReader2 >> map[i][j].pheromone; 
+            }
+        }
+        fileReader2.close();
+    }
+
+    void start(){
+        init("cost.txt", "pheromone.txt");
+        for(int i = 0; i < epochs; i++){
+            travel();
+            updatePheromones();
+        }
+    }
 
     void travel(){
         // Loop for each ant
@@ -245,8 +287,12 @@ class ACO{ // Sequential code
 };
 
 int main(){
-    long long num1 = 184465;
-    long long num2 = 223245;
-    cout << num1*num2 << endl;
+    int totalNodes = TOTAL_NODE;
+    int totalAnts = 30;
+    float evaRate = 0.5;
+    int epochs = 1;
+    ACO aco(totalNodes, totalAnts, evaRate, epochs);
+    
+
     return 0;
 }

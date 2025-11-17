@@ -6,9 +6,10 @@
 #include <stdlib.h>
 #include <iostream>
 #include <vector>
+#include <fstream>
 #include <algorithm>
 using namespace std;
-#define TOTAL_NODE 20
+#define TOTAL_NODE 4
 #define TOTAL_ANT 30
 
 struct edges{
@@ -31,7 +32,7 @@ __global__ void travel(int totalNodes, edges* map, float* delta){
     // Inititalize temp
     for(int i = 0; i < totalNodes; i++){
         for(int j = 0; j < totalNodes; j++){
-            temp[i][j] = 0;
+            temp[i][j] = false;
         }
     }
 
@@ -127,9 +128,8 @@ __global__ void updatePheromones(int totalNodes, float evaRate, edges* map, floa
 void ACOParallel(int totalNodes, float evaRate, size_t mapSize, edges* map, int epochs){
     edges* d_map;
     float* delta; // Pheromone delta matrix
-    int epoch = 1;
     dim3 dimGrid(2,2,1);
-    dim3 dimBlock(10,10,1);
+    dim3 dimBlock(2,2,1);
 
     // Allocate for device map and delta matrix
     cudaMalloc((void**) &d_map, mapSize);
@@ -140,7 +140,10 @@ void ACOParallel(int totalNodes, float evaRate, size_t mapSize, edges* map, int 
     for(int i = 0; i < epochs; i++){
         cudaMemset((void*) delta, 0, sizeof(float)*totalNodes*totalNodes);
         travel<<<1, TOTAL_ANT>>>(totalNodes, d_map, delta);
+        cudaDeviceSynchronize();
         updatePheromones<<<dimGrid, dimBlock>>>(totalNodes, evaRate, d_map, delta);
+        cudaDeviceSynchronize();
+        cout << "Done epoch " << i << endl;
     }
 
     // Copy device to host
@@ -148,13 +151,51 @@ void ACOParallel(int totalNodes, float evaRate, size_t mapSize, edges* map, int 
     cudaFree(d_map);
 }
 
-void init(edges* map, string fileName){
+void init(int totalNodes,edges* map, string fileNameCost, string fileNamePheromone){
+    ifstream fileReader;
+    ifstream fileReader2;
 
+    // Read cost
+    fileReader.open(fileNameCost);
+
+    for(int i = 0; i < totalNodes; i++){
+        for(int j = 0; j < totalNodes; j++){
+           fileReader >> map[i*totalNodes+j].cost; 
+        }
+    }
+
+    // Read pheromone
+    fileReader2.open(fileNamePheromone);
+    for(int i = 0; i < totalNodes; i++){
+        for(int j = 0; j < totalNodes; j++){
+           fileReader2 >> map[i*totalNodes+j].pheromone; 
+        }
+    }
+}
+
+void printPheromone(edges* map){
+    cout << "---------- PHEROMONE PRINTING -----------" << endl;
+    for(int i = 0; i < TOTAL_NODE; i++){
+        for(int j = 0; j < TOTAL_NODE; j++){
+            cout << map[i*TOTAL_NODE + j].pheromone << " ";
+        }
+        cout << endl;
+    }
 }
 
 int main(){
     int totalNodes = TOTAL_NODE;
+    float evaRate = 0.5;
     size_t mapSize = sizeof(edges)*totalNodes*totalNodes;
     edges* map = (edges*)malloc(mapSize);
+    string costFile = "cost.txt";
+    string pheromoneFile = "pheromone.txt";
+    int epochs = 1;
 
+    init(totalNodes, map, "cost.txt","pheromone.txt");
+    cout << "AFTER INIT" << endl;
+    printPheromone(map);
+    ACOParallel(totalNodes, evaRate, mapSize, map, epochs);
+    printPheromone(map);
+    free(map);
 }

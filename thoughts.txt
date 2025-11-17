@@ -26,3 +26,5 @@ https://nidclip.wordpress.com/2014/04/02/cuda-random-number-generation/
 
 - lower memory use of temp, vistied, probs
 - test all things
+- if no node connects to current node, return
+- if last node does not connects to first node, return

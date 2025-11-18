@@ -5,11 +5,13 @@
 #include <curand_kernel.h>
 #include <stdlib.h>
 #include <iostream>
+#include <chrono>
 #include <vector>
 #include <fstream>
 #include <algorithm>
 using namespace std;
-#define TOTAL_NODE 4
+using namespace std::chrono;
+#define TOTAL_NODE 100
 #define TOTAL_ANT 30
 
 struct edges{
@@ -136,8 +138,11 @@ __global__ void updatePheromones(int totalNodes, float evaRate, edges* map, floa
 void ACOParallel(int totalNodes, int totalAnts, float evaRate, size_t mapSize, edges* map, int epochs){
     edges* d_map;
     float* delta; // Pheromone delta matrix
-    dim3 dimGrid(2,2,1);
-    dim3 dimBlock(2,2,1);
+    const int blockSize = 10;
+    const int totalBlocks = (totalNodes + blockSize - 1) / blockSize;
+
+    dim3 dimGrid(totalBlocks,totalBlocks,1);
+    dim3 dimBlock(blockSize,blockSize,1);
 
     // Allocate for device map and delta matrix
     cudaMalloc((void**) &d_map, mapSize);
@@ -151,7 +156,7 @@ void ACOParallel(int totalNodes, int totalAnts, float evaRate, size_t mapSize, e
         cudaDeviceSynchronize();
         updatePheromones<<<dimGrid, dimBlock>>>(totalNodes, evaRate, d_map, delta);
         cudaDeviceSynchronize();
-        cout << "Done epoch " << i << endl;
+        cout << "DONE EPOCH " << i << endl;
     }
 
     // Copy device to host
@@ -202,6 +207,7 @@ void printPheromone(int totalNodes, edges* map){
 }
 
 int main(){
+    auto start = high_resolution_clock::now();
     int totalNodes = TOTAL_NODE;
     int totalAnts = TOTAL_ANT;
     float evaRate = 0.5;
@@ -209,13 +215,18 @@ int main(){
     edges* map = (edges*)malloc(mapSize);
     string costFile = "cost.txt";
     string pheromoneFile = "pheromone.txt";
-    int epochs = 1;
+    int epochs = 50;
 
     init(totalNodes, map, "cost.txt","pheromone.txt");
     cout << "AFTER INIT" << endl;
-    printCost(totalNodes, map);
-    printPheromone(totalNodes, map);
+    //printCost(totalNodes, map);
+    //printPheromone(totalNodes, map);
     ACOParallel(totalNodes, totalAnts, evaRate, mapSize, map, epochs);
-    printPheromone(totalNodes, map);
+    //printPheromone(totalNodes, map);
     free(map);
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<microseconds>(stop - start);
+    cout << "Time taken by function: "
+         << duration.count() << " microseconds" << endl;
+    return 0;
 }

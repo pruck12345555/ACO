@@ -6,8 +6,10 @@
 #include <vector>
 #include <fstream>
 #include <algorithm>
+#include <chrono>
 using namespace std;
-#define TOTAL_NODE 4
+using namespace std::chrono;
+#define TOTAL_NODE 100
 
 struct edges{
     float cost;
@@ -78,12 +80,12 @@ public:
     void start(){
         init("cost.txt", "pheromone.txt");
         cout << "FIRST READ" << endl;
-        printPhems();
+        //printPhems();
         for(int i = 0; i < epochs; i++){
             travel();
             updatePheromones();
             cout << "DONE EPOCH " << i << endl;
-            printPhems();
+            // printPhems();
         }
     }
 
@@ -184,12 +186,16 @@ public:
 };
 
 int main(){
+    auto start = high_resolution_clock::now();
     int totalNodes = TOTAL_NODE;
-    int totalAnts = 200;
+    int totalAnts = 30;
     float evaRate = 0.5;
-    int epochs = 200;
+    int epochs = 50;
     ACO aco(totalNodes, totalAnts, evaRate, epochs);
     aco.start();
-
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<microseconds>(stop - start);
+    cout << "Time taken by function: "
+         << duration.count() << " microseconds" << endl;
     return 0;
 }

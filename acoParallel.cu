@@ -21,6 +21,7 @@ __global__ void travel(int totalNodes,int totalAnts, edges* map, float* delta){
     const int gidx = blockIdx.x * blockDim.x + threadIdx.x;
     bool visited[TOTAL_NODE];
     bool temp[TOTAL_NODE][TOTAL_NODE]; // Boolean matrix to store edges that kth ant went through
+    bool nextNodeExist = false;
 
     // Random 
     curandState_t state;
@@ -49,7 +50,7 @@ __global__ void travel(int totalNodes,int totalAnts, edges* map, float* delta){
         for(int i = 0; i < totalNodes - 1; i++){
             // Calculate for next node
             // Getting totalProbs
-            bool nextNodeExist = false;
+            nextNodeExist = false;
             float probs[TOTAL_NODE];
             float totalProbs = 0;
             for(int l = 0; l < totalNodes; l++) probs[l] = 0;
@@ -64,6 +65,7 @@ __global__ void travel(int totalNodes,int totalAnts, edges* map, float* delta){
                 }
             }
 
+            // If no connecting nodes to go, stop
             if(!nextNodeExist) break;
 
             // Getting all probabilities
@@ -93,7 +95,7 @@ __global__ void travel(int totalNodes,int totalAnts, edges* map, float* delta){
                 }
             }
 
-            // Get next node
+            // Mark edge as visited
             totalCost += map[currNode*totalNodes + nextNode].cost;
             temp[currNode][nextNode] = true;
             temp[nextNode][currNode] = true;
@@ -102,7 +104,7 @@ __global__ void travel(int totalNodes,int totalAnts, edges* map, float* delta){
         }
         
         // Add from finish to start only if start and finish connects
-        if(map[currNode*totalNodes].cost > 0){
+        if(nextNodeExist && map[currNode*totalNodes].cost > 0){
             totalCost += map[currNode*totalNodes].cost;
             temp[currNode][0] = true;
             temp[0][currNode] = true;

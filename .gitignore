@@ -4,9 +4,6 @@
 *.ptx
 *.cubin
 *.fatbin
-*.exe
-*.exp
-*.lib
 .vscode
 images
 ./image*

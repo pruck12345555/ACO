@@ -12,7 +12,7 @@
 using namespace std;
 using namespace std::chrono;
 #define TOTAL_NODE 100
-#define TOTAL_ANT 30
+#define TOTAL_ANT 60
 
 struct edges{
     float cost;
@@ -162,6 +162,7 @@ void ACOParallel(int totalNodes, int totalAnts, float evaRate, size_t mapSize, e
     // Copy device to host
     cudaMemcpy(map, d_map, mapSize, cudaMemcpyDeviceToHost);
     cudaFree(d_map);
+    cudaFree(delta);
 }
 
 void init(int totalNodes,edges* map, string fileNameCost, string fileNamePheromone){
@@ -184,6 +185,9 @@ void init(int totalNodes,edges* map, string fileNameCost, string fileNamePheromo
            fileReader2 >> map[i*totalNodes+j].pheromone; 
         }
     }
+
+    fileReader.close();
+    fileReader2.close();
 }
 
 void printCost(int totalNodes, edges* map){
@@ -215,7 +219,7 @@ int main(){
     edges* map = (edges*)malloc(mapSize);
     string costFile = "cost.txt";
     string pheromoneFile = "pheromone.txt";
-    int epochs = 50;
+    int epochs = 20;
 
     init(totalNodes, map, "cost.txt","pheromone.txt");
     cout << "AFTER INIT" << endl;

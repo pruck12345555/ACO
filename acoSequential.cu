@@ -10,6 +10,8 @@
 using namespace std;
 using namespace std::chrono;
 #define TOTAL_NODE 100
+#define TOTAL_ANT 60
+//chrono::microseconds totalTravel = (chrono::microseconds) 0;
 
 struct edges{
     float cost;
@@ -82,11 +84,16 @@ public:
         cout << "FIRST READ" << endl;
         //printPhems();
         for(int i = 0; i < epochs; i++){
+            //auto start = high_resolution_clock::now();
             travel();
+            //auto stop = high_resolution_clock::now();
+            //totalTravel += duration;
+            //auto duration = duration_cast<microseconds>(stop - start);
             updatePheromones();
             cout << "DONE EPOCH " << i << endl;
-            // printPhems();
+            //printPhems();
         }
+        //printPhems();
     }
 
     void travel(){
@@ -188,14 +195,14 @@ public:
 int main(){
     auto start = high_resolution_clock::now();
     int totalNodes = TOTAL_NODE;
-    int totalAnts = 30;
+    int totalAnts = TOTAL_ANT;
     float evaRate = 0.5;
-    int epochs = 50;
+    int epochs = 20;
     ACO aco(totalNodes, totalAnts, evaRate, epochs);
     aco.start();
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
-    cout << "Time taken by function: "
-         << duration.count() << " microseconds" << endl;
+    cout << "Time taken by main: "
+        << duration.count() << " microseconds" << endl;
     return 0;
 }

@@ -1,3 +1,4 @@
+6610406057 ศุภวัชร สงแก้ว  
 1. Edit total nodes, total ants by editing values of TOTAL_NODE and TOTAL_ANT at the top of each file
 2. Input cost adjacency matrix in the cost.txt file (default 100 nodes)
 3. Input pheromone adjacency matrix in the pheromone.txt file (default 100 nodes)

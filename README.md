@@ -3,7 +3,7 @@
 2. Input cost adjacency matrix in the cost.txt file (default 100 nodes)
 3. Input pheromone adjacency matrix in the pheromone.txt file (default 100 nodes)
 4. To make the program prints out final pheromone matrix then recompile  
-    4.1 Uncomment line 226 on acoParallel.cu  
+    4.1 Uncomment line 231 on acoParallel.cu  
     4.2 Uncomment line 94 on acoSequential.cu  
 5. Compile by nvcc acoSequential.cu -o acoSequential for sequential and nvcc acoParallel.cu -o acoParallel for parallel
 6. Run by ./acoSequential.exe and ./acoParallel.exe  

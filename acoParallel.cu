@@ -19,7 +19,7 @@ struct edges{
     float pheromone;
 };
 
-__global__ void travel(int totalNodes,int totalAnts, edges* map, float* delta){
+__global__ void travel(int totalNodes,int totalAnts, edges* map, float* delta, int epoch){
     const int gidx = blockIdx.x * blockDim.x + threadIdx.x;
     bool visited[TOTAL_NODE];
     bool temp[TOTAL_NODE][TOTAL_NODE]; // Boolean matrix to store edges that kth ant went through
@@ -29,7 +29,7 @@ __global__ void travel(int totalNodes,int totalAnts, edges* map, float* delta){
     curandState_t state;
     curand_init(gidx, /* the seed controls the sequence of random values that are produced */
     0, /* the sequence number is only important with multiple cores */
-    0, /* the offset is how much extra we advance in the sequence for each call, can be 0 */
+    epoch*totalNodes, /* the offset is how much extra we advance in the sequence for each call, can be 0 */
     &state);
     
     // Inititalize temp
@@ -104,12 +104,14 @@ __global__ void travel(int totalNodes,int totalAnts, edges* map, float* delta){
             currNode = nextNode;
             visited[currNode] = true;
         }
+        __syncthreads();
         
         // Add from finish to start only if start and finish connects
         if(nextNodeExist && map[currNode*totalNodes].cost > 0){
             totalCost += map[currNode*totalNodes].cost;
             temp[currNode][0] = true;
             temp[0][currNode] = true;
+            __syncthreads();
 
             // Ant kth finished travel through every node (got Lk)
             // add to pheromone delta matrix
@@ -152,7 +154,7 @@ void ACOParallel(int totalNodes, int totalAnts, float evaRate, size_t mapSize, e
     cudaMemcpy(d_map, map, mapSize, cudaMemcpyHostToDevice);
     for(int i = 0; i < epochs; i++){
         cudaMemset((void*) delta, 0, sizeof(float)*totalNodes*totalNodes);
-        travel<<<1, totalAnts>>>(totalNodes, totalAnts, d_map, delta);
+        travel<<<1, totalAnts>>>(totalNodes, totalAnts, d_map, delta, i);
         cudaDeviceSynchronize();
         updatePheromones<<<dimGrid, dimBlock>>>(totalNodes, evaRate, d_map, delta);
         cudaDeviceSynchronize();

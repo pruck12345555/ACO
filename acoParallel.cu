@@ -150,11 +150,14 @@ void ACOParallel(int totalNodes, int totalAnts, float evaRate, size_t mapSize, e
     cudaMalloc((void**) &d_map, mapSize);
     cudaMalloc((void**) &delta, totalNodes*totalNodes*sizeof(float));
 
+    const int travelSize = 256;
+    const int travelBlocks = (totalAnts + travelSize - 1) / travelSize;
+
     // Copy host to device and travel
     cudaMemcpy(d_map, map, mapSize, cudaMemcpyHostToDevice);
     for(int i = 0; i < epochs; i++){
         cudaMemset((void*) delta, 0, sizeof(float)*totalNodes*totalNodes);
-        travel<<<1, totalAnts>>>(totalNodes, totalAnts, d_map, delta, i);
+        travel<<<travelBlocks, travelSize>>>(totalNodes, totalAnts, d_map, delta, i);
         cudaDeviceSynchronize();
         updatePheromones<<<dimGrid, dimBlock>>>(totalNodes, evaRate, d_map, delta);
         cudaDeviceSynchronize();
